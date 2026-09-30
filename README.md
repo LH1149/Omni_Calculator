@@ -14,6 +14,16 @@ OmniCalc 是一个 Windows 桌面通用运算器，采用 iOS 玻璃风格设计
 - **自定义头像** — 选图后裁剪弹窗选择正方形区域，不压缩比例
 - **单文件 EXE** — PyInstaller 打包，内嵌 ffmpeg，开箱即用
 
+## 界面展示
+
+**汇率换算模式** — 实时汇率、100+ 货币搜索选择、自定义皮肤
+
+![汇率换算模式](docs/images/screenshot.png)
+
+**动态视频皮肤** — 视频背景实时播放，玻璃面板通透叠加
+
+![动态皮肤演示](docs/images/demo.gif)
+
 ## 技术栈
 
 | 组件 | 说明 |
@@ -47,7 +57,8 @@ OmniCalc/
 │   ├── exchange.py      # 汇率换算模式
 │   └── calculator.py    # 数学计算器模式
 └── docs/
-    └── design.md        # 设计文档
+    ├── design.md        # 设计文档
+    └── images/          # README 展示图片（截图、演示 GIF）
 ```
 
 ## 快速开始
