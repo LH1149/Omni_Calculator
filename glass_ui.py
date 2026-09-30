@@ -186,6 +186,7 @@ class GlassWindow(tk.Tk):
         # 视频背景
         self._video_player = None
         self._video_after = None
+        self._video_restart_after = None  # 视频重启防抖定时器
         self._video_mode = False
         self.ffmpeg_dir = find_ffmpeg_dir()
 
@@ -290,11 +291,16 @@ class GlassWindow(tk.Tk):
         self._video_mode = skin is not None and is_video_path(skin)
 
         if self._video_mode and self.ffmpeg_dir:
-            # 视频背景
-            self._stop_video_bg()
-            self._start_video_bg(skin, W, H)
+            # 视频背景：拖拽缩放时 Configure 高频触发，防抖后再重启 ffmpeg
+            if self._video_restart_after:
+                self.after_cancel(self._video_restart_after)
+            self._video_restart_after = self.after(
+                300, lambda p=skin, w=W, h=H: self._do_start_video(p, w, h))
         else:
-            # 静态图片背景
+            # 静态图片背景：取消待重启的视频
+            if self._video_restart_after:
+                self.after_cancel(self._video_restart_after)
+                self._video_restart_after = None
             self._stop_video_bg()
             if skin and not is_video_path(skin):
                 try:
@@ -357,6 +363,12 @@ class GlassWindow(tk.Tk):
 
     # ---- 视频背景 ----
 
+    def _do_start_video(self, path, W, H):
+        """防抖回调：停掉旧播放器，按最终尺寸启动新播放器。"""
+        self._video_restart_after = None
+        self._stop_video_bg()
+        self._start_video_bg(path, W, H)
+
     def _start_video_bg(self, path, W, H):
         ffmpeg_exe = "ffmpeg"
         if self.ffmpeg_dir:
@@ -385,6 +397,10 @@ class GlassWindow(tk.Tk):
             return
         frame = self._video_player.get_frame()
         if frame is not None:
+            # 缩放过程中旧播放器帧尺寸可能与新遮罩不一致，跳过等重启
+            if frame.size != self._corner_mask.size:
+                self._video_after = self.after(20, self._update_video_frame)
+                return
             frame.putalpha(self._corner_mask)
             if self._bg_photo is None:
                 self._bg_photo = ImageTk.PhotoImage(frame)
@@ -539,5 +555,10 @@ class GlassWindow(tk.Tk):
 
     def destroy(self):
         """重写 destroy，确保视频播放器停止。"""
+        if self._video_restart_after:
+            try:
+                self.after_cancel(self._video_restart_after)
+            except Exception:
+                pass
         self._stop_video_bg()
         super().destroy()

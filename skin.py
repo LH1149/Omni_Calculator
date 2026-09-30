@@ -5,9 +5,11 @@
 """
 
 import os
+import re
 import sys
 import json
 import shutil
+import subprocess
 
 from PIL import Image
 
@@ -136,3 +138,83 @@ def cover_image(path, w, h):
     left = (new_w - w) // 2
     top = (new_h - h) // 2
     return img.crop((left, top, left + w, top + h))
+
+
+# ---------------------------------------------------------------- 媒体尺寸
+
+def _ffmpeg_path():
+    """查找 ffmpeg.exe：bin 目录 / 打包资源目录。"""
+    candidates = [
+        os.path.join(app_dir(), "bin", "ffmpeg.exe"),
+        os.path.join(bundle_dir(), "bin", "ffmpeg.exe"),
+        os.path.join(bundle_dir(), "ffmpeg.exe"),
+    ]
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    return "ffmpeg"
+
+
+def media_size(path):
+    """读取图片或视频的原始分辨率 (width, height)，失败返回 None。"""
+    if not path or not os.path.isfile(path):
+        return None
+    ext = os.path.splitext(path)[1].lower()
+    # GIF 和图片用 PIL 读取（GIF 取首帧尺寸）
+    if ext in IMG_EXTS or ext == ".gif":
+        try:
+            with Image.open(path) as im:
+                return im.size
+        except Exception:
+            return None
+    # 真视频：解析 ffmpeg -i 输出中的 分辨率
+    try:
+        proc = subprocess.run(
+            [_ffmpeg_path(), "-i", path],
+            capture_output=True, timeout=8,
+            creationflags=0x08000000)  # CREATE_NO_WINDOW
+        text = proc.stderr.decode("utf-8", errors="ignore")
+        m = re.search(r"(\d{2,5})x(\d{2,5})", text)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return None
+
+
+def fit_window_size(media_w, media_h, screen_w, screen_h,
+                    min_w=480, min_h=500, max_ratio=0.85):
+    """按媒体原始宽高比计算窗口尺寸。
+    - 上限不超过屏幕 max_ratio
+    - 下限不小于 UI 最小尺寸 min_w × min_h
+    """
+    max_w = max(min_w, int(screen_w * max_ratio))
+    max_h = max(min_h, int(screen_h * max_ratio))
+    # 先等比缩放到上限内
+    scale = min(1.0, max_w / media_w, max_h / media_h)
+    w = media_w * scale
+    h = media_h * scale
+    # 仍小于 UI 最小尺寸时等比放大
+    if w < min_w or h < min_h:
+        scale2 = max(min_w / w, min_h / h)
+        w *= scale2
+        h *= scale2
+    return max(min_w, int(w)), max(min_h, int(h))
+
+
+# ---------------------------------------------------------------- 窗口尺寸持久化
+
+def save_window_size(w, h):
+    data = _read_config()
+    data["window_w"] = int(w)
+    data["window_h"] = int(h)
+    _write_config(data)
+
+
+def load_window_size():
+    """返回 (w, h)，无记录返回 None。"""
+    data = _read_config()
+    w, h = data.get("window_w"), data.get("window_h")
+    if isinstance(w, int) and isinstance(h, int) and w >= 480 and h >= 500:
+        return w, h
+    return None

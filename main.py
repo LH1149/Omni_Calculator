@@ -22,7 +22,12 @@ class UniCalcApp(GlassWindow):
     def __init__(self):
         super().__init__()
         self.title("OmniCalc 通用运算器")
-        self.geometry("560x620")
+        # 恢复上次窗口尺寸，否则默认 560×620
+        saved = skin.load_window_size()
+        if saved:
+            self.geometry(f"{saved[0]}x{saved[1]}")
+        else:
+            self.geometry("560x620")
         self.minsize(460, 500)
         self._avatar_photo = None
 
@@ -165,7 +170,19 @@ class UniCalcApp(GlassWindow):
                        ("视频", "*.mp4 *.webm *.mkv *.mov *.avi *.gif")])
         if not path:
             return
-        skin.import_skin(path)
+        dst = skin.import_skin(path)
+        if not dst:
+            return
+        # 读取媒体原始尺寸，按比例自适应窗口（上限屏幕 85%，下限 480×500）
+        size = skin.media_size(dst)
+        if size:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            w, h = skin.fit_window_size(size[0], size[1], screen_w, screen_h)
+            x = max(0, (screen_w - w) // 2)
+            y = max(0, (screen_h - h) // 2)
+            self.geometry(f"{w}x{h}+{x}+{y}")
+            skin.save_window_size(w, h)
         self._refresh_layout()
 
     def _reset_all(self, _e=None):
@@ -188,6 +205,17 @@ class UniCalcApp(GlassWindow):
         self._mode_var.set(name)
         self.bg_canvas.itemconfig("b_mode_txt", text=name)
         self.mode_manager.switch_to(name)
+
+    def destroy(self):
+        """关闭时持久化当前窗口尺寸（最大化状态不保存）。"""
+        try:
+            if not getattr(self, "_maximized", False):
+                w, h = self.winfo_width(), self.winfo_height()
+                if w >= 480 and h >= 500:
+                    skin.save_window_size(w, h)
+        except Exception:
+            pass
+        super().destroy()
 
     # ---- 图标 ----
 
