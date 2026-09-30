@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec
+*.spec.bak
+
+# 运行时用户数据
+skins/
+
+# ffmpeg 二进制（83MB，不纳入版本控制，用户自行下载）
+bin/
+
+# 图标生成产物
+assets/icon.ico
+
+# IDE
+.vscode/
+.idea/
